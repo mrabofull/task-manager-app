@@ -114,7 +114,11 @@ export function Tasks() {
     try {
       await tasksAPI.delete(id);
       toast.success("Task deleted");
-      loadTasks();
+      if (tasks.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        loadTasks();
+      }
     } catch (error: any) {
       toast.error(error.message);
     }
