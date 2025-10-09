@@ -25,6 +25,7 @@ export class AuthController {
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async signup(@Body() signupDto: SignupDto) {
     return this.authService.signup(signupDto);
   }
@@ -65,7 +66,7 @@ export class AuthController {
 
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 3, ttl: 300000 } }) // 3 requests per 5 minutes, 6000 = 1m
+  @Throttle({ default: { limit: 3, ttl: 300000 } }) // 3 requests per 5 minutes, 6000 = 1m (300000ms)
   async resendVerificationCode(@Body() resendDto: ResendVerificationDto) {
     return this.authService.resendVerificationCode(resendDto);
   }

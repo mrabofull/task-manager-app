@@ -18,9 +18,11 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { QueryTasksDto } from './dto/query-tasks.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard)
+@SkipThrottle()
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
