@@ -23,27 +23,6 @@ interface TasksResponse {
 api.interceptors.response.use(
   (res) => res.data, // succ responeses
   (err) => {
-    // errors
-    if (err.response?.status === 401) {
-      const authStorage = localStorage.getItem("auth-storage");
-      if (authStorage) {
-        const authState = JSON.parse(authStorage);
-        authState.state.isAuthenticated = false;
-        authState.state.user = null;
-        localStorage.setItem("auth-storage", JSON.stringify(authState));
-      }
-
-      if (
-        window.location.pathname !== "/login" &&
-        window.location.pathname !== "/signup" &&
-        window.location.pathname !== "/verify"
-      ) {
-        window.location.href = "/login";
-      }
-
-      const message = "Session expired. Please login again.";
-      return Promise.reject(new Error(message));
-    }
     const message = err.response?.data?.message || "Something went wrong";
     return Promise.reject(new Error(message));
   }
