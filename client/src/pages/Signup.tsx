@@ -95,11 +95,11 @@ export function Signup() {
               number
             </p>
           </CardContent>
-          <CardFooter className="pt-3">
+          <CardFooter className="flex flex-col pt-3">
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Sign Up"}
             </Button>
-            <p className="text-sm text-center text-slate-600">
+            <p className="text-sm text-center text-slate-600 pt-2">
               Already have an account?{" "}
               <Link to="/login" className="text-blue-600 hover:underline">
                 Login
