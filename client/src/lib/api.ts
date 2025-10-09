@@ -7,6 +7,18 @@ export const api = axios.create({
   withCredentials: true, // to include cookies when sending requests
 });
 
+interface TasksResponse {
+  data: any[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
 // to check every response before the code sees it
 api.interceptors.response.use(
   (res) => res.data, // succ responeses
@@ -50,7 +62,8 @@ export const authAPI = {
 };
 
 export const tasksAPI = {
-  getAll: (params?: any) => api.get("/tasks", { params }),
+  getAll: (params?: any): Promise<TasksResponse> =>
+    api.get<any, TasksResponse>("/tasks", { params }),
   create: (data: any) => api.post("/tasks", data),
   update: (id: string, data: any) => api.patch(`/tasks/${id}`, data),
   delete: (id: string) => api.delete(`/tasks/${id}`),

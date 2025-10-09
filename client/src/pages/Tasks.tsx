@@ -1,16 +1,8 @@
 import { useState, useEffect } from "react";
-import {
-  Plus,
-  Search,
-  LogOut,
-  CheckCircle2,
-  Circle,
-  Trash2,
-  Edit,
-} from "lucide-react";
+import { Plus, Search, LogOut, Trash2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -222,24 +214,27 @@ export function Tasks() {
           <>
             <div className="space-y-3">
               {tasks.map((task) => (
-                <Card key={task.id} className={task.done ? "opacity-75" : ""}>
+                <Card
+                  key={task.id}
+                  className={`overflow-hidden ${task.done ? "opacity-75" : ""}`}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <Checkbox
                         checked={task.done}
                         onCheckedChange={() => toggleTaskDone(task)}
-                        className="mt-1"
+                        className="mt-1 flex-shrink-0"
                       />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <h3
-                          className={`font-medium break-words ${
+                          className={`font-medium break-all ${
                             task.done ? "line-through text-slate-500" : ""
                           }`}
                         >
                           {task.title}
                         </h3>
                         {task.description && (
-                          <p className="text-sm text-slate-600 mt-1 break-words">
+                          <p className="text-sm text-slate-600 mt-1 break-all whitespace-pre-wrap">
                             {task.description}
                           </p>
                         )}
@@ -249,7 +244,7 @@ export function Tasks() {
                           </p>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-shrink-0">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -299,7 +294,7 @@ export function Tasks() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingTask ? "Edit Task" : "Create New Task"}
@@ -309,14 +304,19 @@ export function Tasks() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
-                <Input id="title" {...register("title")} />
+                <Input id="title" {...register("title")} className="w-full" />
                 {errors.title && (
                   <p className="text-sm text-red-600">{errors.title.message}</p>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description (optional)</Label>
-                <Textarea id="description" {...register("description")} />
+                <Textarea
+                  id="description"
+                  {...register("description")}
+                  className="w-full min-h-[100px] resize-none"
+                  style={{ wordBreak: "break-word" }}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dueDate">Due Date (optional)</Label>
@@ -324,6 +324,7 @@ export function Tasks() {
                   id="dueDate"
                   type="datetime-local"
                   {...register("dueDate")}
+                  className="w-full"
                 />
               </div>
             </div>
