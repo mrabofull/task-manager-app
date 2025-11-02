@@ -5,9 +5,10 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { MailService } from './services/mail.service';
 import { SignupDto } from './dto/signup.dto';
 import { Throttle } from '@nestjs/throttler';
@@ -26,8 +27,8 @@ export class AuthController {
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto);
+  async signup(@Body() signupDto: SignupDto, @Req() request: Request) {
+    return this.authService.signup(signupDto, request);
   }
 
   @Post('verify')
@@ -35,9 +36,10 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async verifyEmail(
     @Body() verifyEmailDto: VerifyEmailDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    return this.authService.verifyEmail(verifyEmailDto, response);
+    return this.authService.verifyEmail(verifyEmailDto, request, response);
   }
 
   @Post('login')
@@ -45,15 +47,28 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(
     @Body() loginDto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    return this.authService.login(loginDto, response);
+    return this.authService.login(loginDto, request, response);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authService.refresh(request, response);
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Res({ passthrough: true }) response: Response) {
-    return this.authService.logout(response);
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authService.logout(request, response);
   }
 
   @Get('dev/mailbox')

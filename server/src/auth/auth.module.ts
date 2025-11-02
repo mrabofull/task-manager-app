@@ -9,23 +9,32 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { MailService } from './services/mail.service';
+import { IpAllowlist } from './entities/ip-allowlist.entity';
+import { UserSession } from './entities/user-session.entity';
+import { SessionService } from './services/session.service';
+import { LoginAttempt } from './entities/login-attempt.entity';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
-    TypeOrmModule.forFeature([VerificationCode]),
+    TypeOrmModule.forFeature([
+      VerificationCode,
+      IpAllowlist,
+      UserSession,
+      LoginAttempt,
+    ]),
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
-        signOptions: { expiresIn: configService.get('JWT_EXPIRATION', '24h') },
+        signOptions: { expiresIn: configService.get('JWT_EXPIRATION') },
       }),
       inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, MailService],
+  providers: [AuthService, JwtStrategy, MailService, SessionService],
 })
 export class AuthModule {}

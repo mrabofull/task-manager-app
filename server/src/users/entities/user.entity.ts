@@ -1,3 +1,4 @@
+import { UserSession } from 'src/auth/entities/user-session.entity';
 import { VerificationCode } from 'src/auth/entities/verification-code.entity';
 import { Task } from 'src/tasks/entities/task.entity';
 import {
@@ -16,6 +17,9 @@ export class User {
 
   @Column({ unique: true })
   email: string;
+
+  @Column({ default: '' })
+  name: string;
 
   @Column({ type: 'timestamp', nullable: true })
   emailVerifiedAt?: Date;
@@ -40,4 +44,7 @@ export class User {
 
   @OneToMany(() => VerificationCode, (code) => code.user)
   verificationCodes: VerificationCode[];
+
+  @OneToMany(() => UserSession, (session) => session.user)
+  sessions: UserSession[];
 }

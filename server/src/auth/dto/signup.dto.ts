@@ -8,6 +8,15 @@ import {
 } from 'class-validator';
 
 export class SignupDto {
+  @IsString()
+  @IsNotEmpty({ message: 'name is required' })
+  @MinLength(3)
+  @MaxLength(20)
+  @Matches(/^[A-Za-z]+(?: [A-Za-z]+)*$/, {
+    message: 'Enter a valid name',
+  })
+  name: string;
+
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsNotEmpty({ message: 'Email is required' })
   email: string;

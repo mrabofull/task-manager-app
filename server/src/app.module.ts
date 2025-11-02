@@ -11,6 +11,9 @@ import { VerificationCode } from './auth/entities/verification-code.entity';
 import { Task } from './tasks/entities/task.entity';
 import { User } from './users/entities/user.entity';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { IpAllowlist } from './auth/entities/ip-allowlist.entity';
+import { UserSession } from './auth/entities/user-session.entity';
+import { LoginAttempt } from './auth/entities/login-attempt.entity';
 
 @Module({
   imports: [
@@ -32,7 +35,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
         //entities: [join(process.cwd(), 'dist/**/*.entity.js')],
-        entities: [User, Task, VerificationCode],
+        entities: [
+          User,
+          Task,
+          VerificationCode,
+          IpAllowlist,
+          UserSession,
+          LoginAttempt,
+        ],
         synchronize: true,
       }),
     }),
