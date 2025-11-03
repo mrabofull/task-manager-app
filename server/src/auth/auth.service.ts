@@ -281,12 +281,12 @@ export class AuthService {
     const code = this.generateVerificationCode();
     const saltRounds = 10;
     const codeHash = await bcrypt.hash(code, saltRounds);
-
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     // Save new verification code
     const verificationCode = this.verificationCodeRepository.create({
       user,
       codeHash,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      expiresAt: expiresAt, // 15 minutes
     });
     await this.verificationCodeRepository.save(verificationCode);
 
@@ -294,8 +294,9 @@ export class AuthService {
     await this.mailService.sendVerificationEmail(user.email, code);
 
     return {
-      message: 'A new verification code has been sent to your email.',
       email: user.email,
+      expiresAt: expiresAt,
+      message: 'A new verification code has been sent to your email.',
     };
   }
 
