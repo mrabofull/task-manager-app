@@ -52,6 +52,7 @@ export function Login() {
       toast.success(response.message);
       navigate("/verify");
     } catch (error: any) {
+      console.error("Login error:", error.message);
       toast.error(error.message);
     } finally {
       setIsLoading(false);

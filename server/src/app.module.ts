@@ -43,7 +43,7 @@ import { LoginAttempt } from './auth/entities/login-attempt.entity';
           UserSession,
           LoginAttempt,
         ],
-        synchronize: true,
+        synchronize: process.env.NODE_ENV !== 'production',
       }),
     }),
     TasksModule,

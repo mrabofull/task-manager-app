@@ -146,8 +146,11 @@ export function Tasks() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold">Task Manager</h1>
             <div className="flex items-center gap-2 sm:gap-4">
-              <span className="text-sm text-slate-600 truncate max-w-[150px] sm:max-w-none">
-                {user?.name || user?.email}
+              <span className="text-sm font-medium text-slate-900 truncate max-w-[150px] sm:max-w-none">
+                {user?.name}
+              </span>
+              <span className="text-xs text-slate-500 truncate max-w-[150px] sm:max-w-none">
+                | {user?.email}
               </span>
               <Button onClick={handleLogout} variant="outline" size="sm">
                 <LogOut className="h-4 w-4 sm:mr-2" />
@@ -327,7 +330,7 @@ export function Tasks() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto -mt-20 sm:mt-0">
           <DialogHeader>
             <DialogTitle>
               {editingTask ? "Edit Task" : "Create New Task"}
@@ -352,13 +355,49 @@ export function Tasks() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date (optional)</Label>
-                <Input
-                  id="dueDate"
-                  type="datetime-local"
-                  {...register("dueDate")}
-                  className="w-full"
-                />
+                <Label>Due Date (optional)</Label>
+
+                {/* Mobile*/}
+                <div className="sm:hidden space-y-2">
+                  <Input
+                    type="date"
+                    className="w-full"
+                    onChange={(e) => {
+                      const currentTime =
+                        editingTask?.dueDate?.split("T")[1]?.substring(0, 5) ||
+                        "12:00";
+                      setValue(
+                        "dueDate",
+                        e.target.value ? `${e.target.value}T${currentTime}` : ""
+                      );
+                    }}
+                    defaultValue={editingTask?.dueDate?.split("T")[0] || ""}
+                  />
+                  <Input
+                    type="time"
+                    className="w-full"
+                    onChange={(e) => {
+                      const currentDate =
+                        editingTask?.dueDate?.split("T")[0] ||
+                        new Date().toISOString().split("T")[0];
+                      setValue("dueDate", `${currentDate}T${e.target.value}`);
+                    }}
+                    defaultValue={
+                      editingTask?.dueDate?.split("T")[1]?.substring(0, 5) ||
+                      "12:00"
+                    }
+                  />
+                </div>
+
+                {/* Desktop */}
+                <div className="hidden sm:block">
+                  <Input
+                    id="dueDate"
+                    type="datetime-local"
+                    {...register("dueDate")}
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>

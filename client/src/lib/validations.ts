@@ -25,10 +25,7 @@ export const signupSchema = z
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z
-    .string()
-    .min(8, "Password must be between 8 and 25 characters")
-    .max(25),
+  password: z.string().min(8, "Enter a valid password").max(25),
 });
 
 export const verifySchema = z.object({

@@ -32,5 +32,5 @@ export class UserSession {
   createdAt: Date;
 
   @UpdateDateColumn()
-  updateAt: Date;
+  updatedAt: Date;
 }

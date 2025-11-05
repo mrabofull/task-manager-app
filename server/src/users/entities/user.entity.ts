@@ -27,12 +27,6 @@ export class User {
   @Column()
   passwordHash: string;
 
-  @Column({ type: 'int', default: 0 })
-  failedLoginCount: number;
-
-  @Column({ type: 'timestamp', nullable: true })
-  lockoutUntil?: Date | null;
-
   @CreateDateColumn()
   createdAt: Date;
 

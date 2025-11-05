@@ -24,5 +24,5 @@ export class IpAllowlist {
   createdAt: Date;
 
   @UpdateDateColumn()
-  updateAt: Date;
+  updatedAt: Date;
 }

@@ -3,13 +3,19 @@ import { UserSession } from '../entities/user-session.entity';
 import { Repository } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class SessionService {
+  private readonly maxSessions: number;
+
   constructor(
     @InjectRepository(UserSession)
     private sessionRepository: Repository<UserSession>,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    this.maxSessions = this.configService.get<number>('MAX_USER_SESSIONS', 3);
+  }
 
   async createSession(
     user: User,
@@ -22,7 +28,7 @@ export class SessionService {
       order: { lastUsedAt: 'ASC' },
     });
 
-    if (sessions.length >= 3) {
+    if (sessions.length >= this.maxSessions) {
       await this.sessionRepository.delete(sessions[0].id);
     }
 

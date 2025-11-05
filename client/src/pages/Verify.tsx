@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -197,6 +197,15 @@ export function Verify() {
                 ? `Resend code in ${resendCooldown}s`
                 : "Resend Code"}
             </Button>
+            <p className="text-sm text-center text-slate-600">
+              Wrong Email?{" "}
+              <Link
+                to="/login"
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Login
+              </Link>
+            </p>
           </CardFooter>
         </form>
       </Card>

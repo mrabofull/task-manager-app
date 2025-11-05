@@ -1,12 +1,16 @@
 import {
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { MailService } from './services/mail.service';
@@ -16,6 +20,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -82,7 +87,41 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 300000 } }) // 3 requests per 5 minutes, 6000 = 1m (300000ms)
-  async resendVerificationCode(@Body() resendDto: ResendVerificationDto) {
-    return this.authService.resendVerificationCode(resendDto);
+  async resendVerificationCode(
+    @Body() resendDto: ResendVerificationDto,
+    @Req() request: Request,
+  ) {
+    return this.authService.resendVerificationCode(resendDto, request);
+  }
+
+  @Get('admin/ip-allowlist')
+  @UseGuards(JwtAuthGuard)
+  async getIpAllowlist(@Req() request: any) {
+    // Simple admin check by email
+    if (request.user.email !== process.env.ADMIN_EMAIL) {
+      throw new ForbiddenException('Admin access only');
+    }
+    return this.authService.getIpAllowlist();
+  }
+
+  @Post('admin/ip-allowlist')
+  @UseGuards(JwtAuthGuard)
+  async addIpToAllowlist(
+    @Body() dto: { ip: string; label?: string },
+    @Req() request: any,
+  ) {
+    if (request.user.email !== process.env.ADMIN_EMAIL) {
+      throw new ForbiddenException('Admin access only');
+    }
+    return this.authService.addIpToAllowlist(dto.ip, dto.label);
+  }
+
+  @Delete('admin/ip-allowlist/:id')
+  @UseGuards(JwtAuthGuard)
+  async removeIpFromAllowlist(@Param('id') id: string, @Req() request: any) {
+    if (request.user.email !== process.env.ADMIN_EMAIL) {
+      throw new ForbiddenException('Admin access only');
+    }
+    return this.authService.removeIpFromAllowlist(id);
   }
 }

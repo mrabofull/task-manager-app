@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('login_attempts')
@@ -16,12 +17,18 @@ export class LoginAttempt {
   @Column()
   ipAddress: string;
 
-  @Column({ type: 'int', default: 1 })
+  @Column({ type: 'int', default: 0 })
   attemptCount: number;
 
   @Column({ type: 'timestamp', nullable: true })
-  lockoutUntil?: Date;
+  lockoutUntil?: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastAttemptAt?: Date;
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -11,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UsersService } from 'src/users/users.service';
 import { MailService } from './services/mail.service';
 import { VerificationCode } from './entities/verification-code.entity';
-import { MoreThan, Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { SignupDto } from './dto/signup.dto';
 import * as bcrypt from 'bcrypt';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -48,8 +49,10 @@ export class AuthService {
       );
     }
 
+    const normalizedEmail = this.normalizeEmail(signupDto.email);
+
     // Check if user exists
-    const existingUser = await this.usersService.findByEmail(signupDto.email);
+    const existingUser = await this.usersService.findByEmail(normalizedEmail);
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
@@ -62,7 +65,7 @@ export class AuthService {
 
     // Create user
     const user = await this.usersService.create(
-      signupDto.email,
+      normalizedEmail,
       signupDto.name,
       passwordHash,
     );
@@ -78,21 +81,19 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
     });
 
-    // To del
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    console.log('Local display:', expiresAt);
-    console.log('As UTC ISO:', expiresAt.toISOString());
-    //
+    // const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    // console.log('Local display:', expiresAt);
+    // console.log('As UTC ISO:', expiresAt.toISOString());
 
     await this.verificationCodeRepository.save(verificationCode);
 
     // Send email
-    await this.mailService.sendVerificationEmail(user.email, code);
+    await this.mailService.sendVerificationEmail(normalizedEmail, code);
 
     return {
       message:
         'Account created successfully. Please check your email for verification code.',
-      email: user.email,
+      email: normalizedEmail,
       expiresAt: verificationCode.expiresAt,
     };
   }
@@ -102,7 +103,18 @@ export class AuthService {
     request: Request,
     response: Response,
   ) {
-    const user = await this.usersService.findByEmail(verifyDto.email);
+    const clientIp = this.getClientIp(request);
+    const ipAllowed = await this.checkIpAllowlist(clientIp);
+
+    if (!ipAllowed) {
+      throw new ForbiddenException(
+        'Verifying is restricted from your location.',
+      );
+    }
+
+    const normalizedEmail = this.normalizeEmail(verifyDto.email);
+
+    const user = await this.usersService.findByEmail(normalizedEmail);
     if (!user) {
       throw new BadRequestException('Invalid email or code');
     }
@@ -130,7 +142,7 @@ export class AuthService {
 
     const { accessToken, refreshToken } = await this.generateTokens(
       user.id,
-      user.email,
+      normalizedEmail,
       user.name,
     );
 
@@ -150,20 +162,15 @@ export class AuthService {
     return {
       message: 'Successfully logged in',
       user: {
-        email: user.email,
+        email: normalizedEmail,
         name: user.name,
       },
     };
   }
 
   async login(loginDto: LoginDto, request: Request, response: Response) {
+    const normalizedEmail = this.normalizeEmail(loginDto.email);
     const clientIp = this.getClientIp(request);
-
-    // Check hybrid lockout (IP + account)
-    const isLocked = await this.checkHybridLockout(loginDto.email, clientIp);
-    if (isLocked.locked) {
-      throw new UnauthorizedException(isLocked.message);
-    }
 
     // Check IP allowlist
     const ipAllowed = await this.checkIpAllowlist(clientIp);
@@ -172,18 +179,20 @@ export class AuthService {
       throw new ForbiddenException('Login is restricted from your location.');
     }
 
-    const user = await this.usersService.findByEmail(loginDto.email);
+    await this.checkLockout(normalizedEmail, clientIp);
+
+    const user = await this.usersService.findByEmail(normalizedEmail);
 
     if (
       !user ||
       !(await bcrypt.compare(loginDto.password, user.passwordHash))
     ) {
-      await this.recordFailedAttempt(loginDto.email, clientIp);
+      await this.recordFailedLogin(normalizedEmail, clientIp, !!user);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Reset attempts on successful password verification
-    await this.resetLoginAttempts(loginDto.email, clientIp);
+    await this.resetLoginAttempts(normalizedEmail);
 
     // Generate and send login verification code
     const code = this.generateVerificationCode();
@@ -197,16 +206,25 @@ export class AuthService {
     await this.verificationCodeRepository.save(verificationCode);
 
     // Send email
-    await this.mailService.sendVerificationEmail(user.email, code);
+    await this.mailService.sendVerificationEmail(normalizedEmail, code);
 
     return {
       message: 'Please check your email for verification code.',
-      email: user.email,
+      email: normalizedEmail,
       expiresAt: verificationCode.expiresAt,
     };
   }
 
   async refresh(request: Request, response: Response) {
+    const clientIp = this.getClientIp(request);
+    const ipAllowed = await this.checkIpAllowlist(clientIp);
+
+    if (!ipAllowed) {
+      throw new ForbiddenException(
+        'Using the application is restricted from your location.',
+      );
+    }
+
     const refreshToken = request.cookies['refresh_token'];
 
     if (!refreshToken) {
@@ -268,8 +286,21 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async resendVerificationCode(resendDto: ResendVerificationDto) {
-    const user = await this.usersService.findByEmail(resendDto.email);
+  async resendVerificationCode(
+    resendDto: ResendVerificationDto,
+    request: Request,
+  ) {
+    const clientIp = this.getClientIp(request);
+    const ipAllowed = await this.checkIpAllowlist(clientIp);
+
+    if (!ipAllowed) {
+      throw new ForbiddenException(
+        'Registration is restricted from your location.',
+      );
+    }
+
+    const normalizedEmail = this.normalizeEmail(resendDto.email);
+    const user = await this.usersService.findByEmail(normalizedEmail);
 
     if (!user) {
       return {
@@ -281,21 +312,21 @@ export class AuthService {
     const code = this.generateVerificationCode();
     const saltRounds = 10;
     const codeHash = await bcrypt.hash(code, saltRounds);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
     // Save new verification code
     const verificationCode = this.verificationCodeRepository.create({
       user,
       codeHash,
-      expiresAt: expiresAt, // 15 minutes
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
     });
     await this.verificationCodeRepository.save(verificationCode);
 
     // Send email
-    await this.mailService.sendVerificationEmail(user.email, code);
+    await this.mailService.sendVerificationEmail(normalizedEmail, code);
 
     return {
-      email: user.email,
-      expiresAt: expiresAt,
+      email: normalizedEmail,
+      expiresAt: verificationCode.expiresAt,
       message: 'A new verification code has been sent to your email.',
     };
   }
@@ -333,13 +364,29 @@ export class AuthService {
     });
   }
 
+  // private getClientIp(request: Request): string {
+  //   return (
+  //     request.ip ||
+  //     request.connection?.remoteAddress ||
+  //     request.headers['x-forwarded-for']?.toString().split(',')[0] ||
+  //     ''
+  //   );
+  // }
+
   private getClientIp(request: Request): string {
-    return (
-      request.ip ||
-      request.connection?.remoteAddress ||
-      request.headers['x-forwarded-for']?.toString().split(',')[0] ||
-      ''
-    );
+    // Check forwarded headers (when behind proxy/load balancer)
+    const forwarded = request.headers['x-forwarded-for'];
+    if (forwarded) {
+      return forwarded.toString().split(',')[0].trim();
+    }
+
+    const realIp = request.headers['x-real-ip'];
+    if (realIp) {
+      return realIp.toString();
+    }
+
+    const ip = request.ip || request.connection?.remoteAddress || '::1';
+    return ip === '::1' ? '127.0.0.1' : ip;
   }
 
   private getUserAgent(request: Request): string {
@@ -358,113 +405,216 @@ export class AuthService {
     return !!allowedIp;
   }
 
-  // Hybrid lockout strategy
-  private async checkHybridLockout(
-    email: string,
-    ipAddress: string,
-  ): Promise<{ locked: boolean; message?: string }> {
-    // Check both email and IP lockouts
-    const [emailAttempt, ipAttempt] = await Promise.all([
-      this.loginAttemptRepository.findOne({
-        where: { email },
-        order: { createdAt: 'DESC' },
-      }),
-      this.loginAttemptRepository.findOne({
-        where: { ipAddress },
-        order: { createdAt: 'DESC' },
-      }),
-    ]);
-
-    const now = new Date();
+  private async checkLockout(email: string, ipAddress: string): Promise<void> {
+    const normalizedEmail = this.normalizeEmail(email);
 
     // Check email lockout
-    if (emailAttempt?.lockoutUntil && emailAttempt.lockoutUntil > now) {
-      const minutesLeft = Math.ceil(
-        (emailAttempt.lockoutUntil.getTime() - now.getTime()) / 60000,
-      );
-      return {
-        locked: true,
-        message: `Account locked due to multiple failed attempts. Try again in ${minutesLeft} minute(s).`,
-      };
+    const emailAttempt = await this.loginAttemptRepository.findOne({
+      where: { email: normalizedEmail },
+      order: { updatedAt: 'DESC' },
+    });
+
+    if (emailAttempt) {
+      // Check if currently locked
+      if (
+        emailAttempt.lockoutUntil &&
+        new Date(emailAttempt.lockoutUntil) > new Date()
+      ) {
+        const minutesLeft = Math.ceil(
+          (new Date(emailAttempt.lockoutUntil).getTime() - Date.now()) / 60000,
+        );
+        throw new UnauthorizedException(
+          `Account locked. Try again in ${minutesLeft} minute(s).`,
+        );
+      }
+
+      // If lockout expired, reset counter
+      if (
+        emailAttempt.lockoutUntil &&
+        new Date(emailAttempt.lockoutUntil) <= new Date()
+      ) {
+        emailAttempt.attemptCount = 0;
+        emailAttempt.lockoutUntil = null;
+        emailAttempt.lastAttemptAt = new Date();
+        await this.loginAttemptRepository.save(emailAttempt);
+      }
+
+      // Reset if last attempt was over 2 hours ago
+      if (emailAttempt.lastAttemptAt) {
+        const hoursSinceLastAttempt =
+          (Date.now() - new Date(emailAttempt.lastAttemptAt).getTime()) /
+          (1000 * 60 * 60);
+
+        if (hoursSinceLastAttempt > 2) {
+          emailAttempt.attemptCount = 0;
+          emailAttempt.lockoutUntil = null;
+          await this.loginAttemptRepository.save(emailAttempt);
+        }
+      }
     }
 
     // Check IP lockout
-    if (ipAttempt?.lockoutUntil && ipAttempt.lockoutUntil > now) {
-      const minutesLeft = Math.ceil(
-        (ipAttempt.lockoutUntil.getTime() - now.getTime()) / 60000,
-      );
-      return {
-        locked: true,
-        message: `Too many attempts from this location. Try again in ${minutesLeft} minute(s).`,
-      };
-    }
+    const ipAttempt = await this.loginAttemptRepository.findOne({
+      where: {
+        ipAddress,
+        email: IsNull(),
+      },
+      order: { updatedAt: 'DESC' },
+    });
 
-    return { locked: false };
+    if (ipAttempt) {
+      // Check if currently locked
+      if (
+        ipAttempt.lockoutUntil &&
+        new Date(ipAttempt.lockoutUntil) > new Date()
+      ) {
+        const minutesLeft = Math.ceil(
+          (new Date(ipAttempt.lockoutUntil).getTime() - Date.now()) / 60000,
+        );
+        throw new UnauthorizedException(
+          `Too many attempts from this location. Try again in ${minutesLeft} minute(s).`,
+        );
+      }
+
+      // If lockout expired, reset counter
+      if (
+        ipAttempt.lockoutUntil &&
+        new Date(ipAttempt.lockoutUntil) <= new Date()
+      ) {
+        ipAttempt.attemptCount = 0;
+        ipAttempt.lockoutUntil = null;
+
+        await this.loginAttemptRepository.save(ipAttempt);
+      }
+
+      // Reset IP counter after 1 hour of no attempts
+      if (ipAttempt.lastAttemptAt) {
+        const hoursSinceLastAttempt =
+          (Date.now() - new Date(ipAttempt.lastAttemptAt).getTime()) /
+          (1000 * 60 * 60);
+
+        if (hoursSinceLastAttempt > 1) {
+          ipAttempt.attemptCount = 0;
+          ipAttempt.lockoutUntil = null;
+          await this.loginAttemptRepository.save(ipAttempt);
+        }
+      }
+    }
   }
 
-  private async recordFailedAttempt(
+  private async recordFailedLogin(
     email: string,
     ipAddress: string,
+    userExists: boolean,
   ): Promise<void> {
-    // Record for email
-    let emailAttempt = await this.loginAttemptRepository.findOne({
-      where: { email },
-    });
+    const normalizedEmail = this.normalizeEmail(email);
 
-    if (!emailAttempt) {
-      emailAttempt = this.loginAttemptRepository.create({
-        email,
-        ipAddress,
-        attemptCount: 0,
+    // Only track existing users for email-based lockout
+    if (userExists) {
+      let emailAttempt = await this.loginAttemptRepository.findOne({
+        where: { email: normalizedEmail },
       });
+
+      if (!emailAttempt) {
+        emailAttempt = this.loginAttemptRepository.create({
+          email: normalizedEmail,
+          ipAddress, // Store which IP attempted this email
+          attemptCount: 0,
+        });
+      }
+
+      // Update IP address to track where attempt came from
+      emailAttempt.ipAddress = ipAddress;
+      emailAttempt.attemptCount++;
+      emailAttempt.lastAttemptAt = new Date();
+
+      // Lock after 3 attempts for 2 minutes
+      if (emailAttempt.attemptCount === 3) {
+        emailAttempt.lockoutUntil = new Date(Date.now() + 2 * 60 * 1000);
+      }
+
+      await this.loginAttemptRepository.save(emailAttempt);
     }
 
-    emailAttempt.attemptCount++;
-
-    // Exponential backoff for account
-    if (emailAttempt.attemptCount >= 3) {
-      const delayMinutes = Math.min(
-        Math.pow(2, emailAttempt.attemptCount - 3),
-        30,
-      );
-      emailAttempt.lockoutUntil = new Date(
-        Date.now() + delayMinutes * 60 * 1000,
-      );
-    }
-
-    await this.loginAttemptRepository.save(emailAttempt);
-
-    // Record for IP
+    // Track IP attempts separately (for all attempts, even non-existent users)
     let ipAttempt = await this.loginAttemptRepository.findOne({
-      where: { ipAddress },
+      where: {
+        ipAddress,
+        email: IsNull(),
+      },
     });
-
-    if (ipAttempt && ipAttempt.email) {
-      ipAttempt = null; // This is an email-specific attempt, not IP-only
-    }
 
     if (!ipAttempt) {
       ipAttempt = this.loginAttemptRepository.create({
         ipAddress,
         attemptCount: 0,
+        // email is explicitly null for IP-only records
       });
     }
 
     ipAttempt.attemptCount++;
+    ipAttempt.lastAttemptAt = new Date();
 
-    // Lock IP after 10 attempts (higher threshold for IP)
-    if (ipAttempt.attemptCount >= 10) {
-      ipAttempt.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    // Lock IP after 10 attempts for 15 minutes
+    if (ipAttempt.attemptCount === 10) {
+      ipAttempt.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000);
     }
 
     await this.loginAttemptRepository.save(ipAttempt);
   }
 
-  private async resetLoginAttempts(
-    email: string,
-    ipAddress: string,
-  ): Promise<void> {
-    await this.loginAttemptRepository.delete({ email });
-    // Don't reset IP attempts to track patterns
+  private async resetLoginAttempts(email: string): Promise<void> {
+    const normalizedEmail = this.normalizeEmail(email);
+    await this.loginAttemptRepository.delete({ email: normalizedEmail });
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.toLowerCase().trim();
+  }
+
+  async getIpAllowlist() {
+    const allowlist = await this.ipAllowlistRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+    return allowlist;
+  }
+
+  async addIpToAllowlist(ip: string, label?: string) {
+    // Validate IP format
+    const ipRegex =
+      /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    if (!ipRegex.test(ip)) {
+      throw new BadRequestException('Invalid IP address format');
+    }
+
+    // Check if already exists
+    const existing = await this.ipAllowlistRepository.findOne({
+      where: { ip },
+    });
+
+    if (existing) {
+      throw new ConflictException('IP address already in allowlist');
+    }
+
+    const entry = this.ipAllowlistRepository.create({
+      ip,
+      label: label || `Added ${new Date().toLocaleDateString()}`,
+      isActive: true,
+    });
+
+    return this.ipAllowlistRepository.save(entry);
+  }
+
+  async removeIpFromAllowlist(id: string) {
+    const entry = await this.ipAllowlistRepository.findOne({
+      where: { id },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('IP entry not found');
+    }
+
+    await this.ipAllowlistRepository.delete(id);
+    return { message: 'IP removed successfully' };
   }
 }
