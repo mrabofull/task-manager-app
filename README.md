@@ -1,6 +1,11 @@
 # Task Manager Full-Stack Application
 
-A production-ready task management application with secure authentication, email verification, and comprehensive task CRUD operations.
+A production-ready task management application with advanced security features, dual lockout mechanisms, IP allowlist, email verification, and task CRUD operations.
+
+## 🚀 Live Demo
+
+- **Frontend**: https://task-manager-app-cj3n.onrender.com/
+- **Backend API**: https://taskmanager-api-dfgc.onrender.com/api
 
 ## 🚀 Quick Start
 
@@ -29,14 +34,31 @@ npm install
 Create `.env` file in server directory:
 
 ```env
-DB_HOST=localhost
+DATABASE_URL=postgresql://...  # For production (Render)
+DB_HOST=127.0.0.1
 DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=yourpassword
-DB_NAME=taskmanager
-JWT_SECRET=your-secure-secret-key
-JWT_EXPIRATION=24h
+DB_USERNAME=postgres1
+DB_PASSWORD=TestPassword1
+DB_NAME=tasks
+JWT_SECRET=sdf9w34rFJ3Fasd1sdff09sDFJ9Sdf6f4sDFJsdjfsdFsfs
+JWT_EXPIRATION=15m
+BCRYPT_SALT_ROUNDS=10
+JWT_REFRESH_SECRET=sdf9w34rFJ3Fasd1sdff09sDFJ9Sdf6f4sDFJsdjfsdFszf
+MAX_USER_SESSIONS=3
+JWT_REFRESH_EXPIRATION=7d
+PORT=3000
+# Email settings (Gmail)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=example@example.com
+SMTP_PASSWORD=safasdgfssds
+SMTP_FROM_NAME=example
+NODE_ENV=development # development || production
+ADMIN_EMAIL=example@example.com
 ```
+
+`.env.production` in fontend directory:
+VITE_API_URL=api://... # For production (Render)
 
 Start the backend:
 
@@ -64,29 +86,51 @@ npm run dev
 
 - **User Authentication**
 
-  - Sign up with email and password
-  - Email verification with 6-digit code (15-minute expiry)
-  - Login with JWT stored in HttpOnly cookies
-  - Account lockout after 3 failed attempts (2 minutes)
-  - Logout functionality
+  - Sign up with email verification (6-digit code, 15-minute expiry)
+  - Email verification required on every login (2FA-like security)
+  - JWT with HttpOnly cookies (15-min access + 7-day refresh tokens)
+  - Automatic token refresh on API calls
+  - Secure logout with cookie clearing
 
 - **Task Management**
 
-  - Create tasks with title, optional description, and due date
-  - View all tasks (paginated, 10 per page)
-  - Update task details and completion status
-  - Delete tasks
-  - Search tasks by title/description
-  - Filter by completion status (All/Active/Completed)
+  - Full CRUD operations (Create, Read, Update, Delete)
   - User-isolated data (each user sees only their tasks)
+  - Search by title/description
+  - Filter by completion status (All/Active/Completed)
+  - Pagination (10 tasks per page)
+  - Due dates with date/time picker
+  - Mobile-responsive task interface
 
-- **Security Features**
-  - Password hashing with bcrypt (10 rounds)
-  - Rate limiting on auth endpoints
-  - Input validation and sanitization
-  - CORS configuration for production
-  - Session persistence across refresh
-  - Automatic logout on token expiration
+### Advanced Security Features ✅
+
+- **Dual Lockout System**
+
+  - Account lockout: 3 failed attempts = 2-minute lock (per user)
+  - IP lockout: 10 failed attempts from any IP = 15-minute lock
+  - Failed attempt counters reset after 2 hours of inactivity
+  - Lockout timers shown to users
+
+- **IP Allowlist (Production Mode)**
+
+  - Database-persisted IP restrictions
+  - Admin API endpoints for management
+  - Bypassed in development mode for testing
+  - Tamper-resistant with server-side validation
+
+- **Session Management**
+
+  - Maximum 3 concurrent sessions per user
+  - Oldest session auto-revoked on new login
+  - Session tracking in database
+
+- **Additional Security**
+  - Rate limiting: 10 requests/minute per endpoint
+  - CSRF protection with SameSite cookies
+  - Input validation with Zod (frontend) and class-validator (backend)
+  - SQL injection prevention via TypeORM parameterized queries
+  - XSS prevention with React's built-in escaping
+  - Generic error messages to prevent user enumeration
 
 ### UI/UX Features
 
@@ -104,8 +148,9 @@ npm run dev
 - **Database**: PostgreSQL with TypeORM
 - **Authentication**: JWT with HttpOnly cookies
 - **Validation**: class-validator and class-transformer and ValidationPipe
-- **Security**: bcrypt, @nestjs/throttler for rate limiting
-- **Email**: Mock email service with JSON file persistence
+- **Security**: bcrypt, @nestjs/throttler for rate limiting, CORS
+- **Email**: Dual mode (SMTP for production, file-based for dev)
+- **Deployment**: Render (with auto-deploy from GitHub)
 
 ### Frontend
 
@@ -115,47 +160,65 @@ npm run dev
 - **State Management**: Zustand (chosen for minimal boilerplate and TypeScript support)
 - **Forms**: React Hook Form + Zod validation
 - **Routing**: React Router v6
-- **HTTP Client**: Axios with interceptors
-- **Notifications**: Sonner
+- **HTTP Client**: Axios with interceptors for auto-refresh
+- **Notifications**: Sonner for toast messages
+- **Deployment**: Render (with auto-deploy from GitHub)
+
+### Database
+
+- **SQL**: PostgreSQL
+- **Deployment**: Render
 
 ## 📁 Project Structure
 
 ```
 task-manager-app/
-├── server/                 # Backend NestJS application
+├── server/                     # Backend (NestJS)
 │   ├── src/
-│   │   ├── auth/          # Authentication module
-│   │   ├── tasks/         # Tasks CRUD module
-│   │   ├── users/         # User management module
-│   │   └── main.ts        # Application entry point
-│   └── .env               # Environment variables
+│   │   ├── auth/               # Authentication module
+│   │   │   ├── entities/       # User, UserSession, LoginAttempt, IpAllowlist, VerificationCode
+│   │   │   ├── services/       # MailService, verification logic
+│   │   │   ├── guards/         # JWT auth guard
+│   │   │   └── strategies/     # JWT and refresh token strategies
+│   │   ├── tasks/              # Tasks CRUD module
+│   │   │   └── entities/       # Task entity
+        ├── users/
+            └── entities/
+│   │   └── main.ts             # App entry (CORS, global pipes, etc.)
+│   └── dist/                   # Compiled backend JavaScript
 │
-├── client/                 # Frontend React application
+├── client/                     # Frontend (React + TypeScript + Vite)
 │   ├── src/
-│   │   ├── components/    # Reusable UI components
-│   │   ├── pages/         # Route pages
-│   │   ├── lib/           # API client and utilities
-│   │   ├── stores/        # Zustand state stores
-│   │   └── types/         # TypeScript type definitions
-│   └── package.json
+│   │   ├── components/         # Auth, Tasks, UI components
+│   │   ├── pages/              # Login, Signup, Verify, Tasks pages
+│   │   ├── lib/                # API client with interceptors (axios)
+│   │   └── hooks/              # Custom React hooks
+│   └── dist/                   # Production frontend build
 │
 └── README.md
+
 ```
 
 ## 🔐 API Endpoints
 
-| Method | Endpoint                        | Description              | Rate Limit |
-| ------ | ------------------------------- | ------------------------ | ---------- |
-| POST   | `/api/auth/signup`              | Register new user        | -          |
-| POST   | `/api/auth/verify`              | Verify email with code   | 5/min      |
-| POST   | `/api/auth/login`               | Login user               | 10/min     |
-| POST   | `/api/auth/logout`              | Logout user              | -          |
-| POST   | `/api/auth/resend-verification` | Resend verification code | 3/5min     |
-| GET    | `/api/tasks`                    | Get user's tasks         | -          |
-| POST   | `/api/tasks`                    | Create new task          | -          |
-| PATCH  | `/api/tasks/:id`                | Update task              | -          |
-| DELETE | `/api/tasks/:id`                | Delete task              | -          |
-| GET    | `/api/auth/dev/mailbox`         | View sent emails         | -          |
+| Method | Endpoint                           | Description              | Rate Limit |
+| ------ | ---------------------------------- | ------------------------ | ---------- |
+| POST   | `/api/auth/signup`                 | Register new user        | -          |
+| POST   | `/api/auth/verify`                 | Verify email with code   | 5/min      |
+| POST   | `/api/auth/login`                  | Login user               | 10/min     |
+| POST   | `/api/auth/logout`                 | Logout user              | -          |
+| POST   | `/api/auth/refresh`                | Refresh JWT token        | -          |
+| POST   | `/api/auth/resend-verification`    | Resend verification code | 3/5min     |
+| GET    | `/api/tasks`                       | Get user's tasks         | -          |
+| POST   | `/api/tasks`                       | Create new task          | -          |
+| PATCH  | `/api/tasks/:id`                   | Update task              | -          |
+| DELETE | `/api/tasks/:id`                   | Delete task              | -          |
+| GET    | `/api/auth/dev/mailbox`            | View sent emails         | -          |
+| GET    | `/api/auth/admin/ip-allowlist`     | List allowed IPs         | -          |
+| POST   | `/api/auth/admin/ip-allowlist`     | Add IP to allowlist      | -          |
+| DELETE | `/api/auth/admin/ip-allowlist/:id` | Remove IP                | -          |
+
+**.env example is found inside of the server folder**
 
 ## 💡 Architecture Decisions
 
@@ -171,26 +234,29 @@ I chose Zustand over Redux/Context API because:
 
 ### Security Approach
 
+- **Dual lockout** Both per-account and per-IP protection
 - **HttpOnly cookies** for JWT storage (prevents XSS attacks)
-- **Account lockout** per user (not IP) to prevent user enumeration
+- **Refresh tokens** Short-lived access tokens (15 min) with long refresh (7 days)
 - **Rate limiting** on authentication endpoints
 - **Bcrypt** with 10 salt rounds for password hashing
+- **IP allowlist** Production-only restriction with admin management
 - **Input validation** at both frontend (Zod) and backend (class-validator)
 
 ## ⏱ Development Timeline
 
-- Backend setup and authentication: ~6 hours
-- Frontend setup and auth pages: ~6 hours
+- Backend setup and authentication: ~15 hours
+- Frontend setup and auth pages: ~12 hours
 - Task CRUD implementation: ~4 hours
-- Bug fixes and polish: ~2 hours
-- Documentation: ~30 minutes
-- **Total: ~18.5 hours**
+- Bug fixes and polish: ~6 hours
+- Documentation: ~1 hour
+- Deployment & troubleshooting: 2 hours
+- **Total: ~40 hours**
 
 ## 🚧 Future Improvements (with more time)
 
 - **Testing**: Unit tests for services, integration tests for API
 - **Features**: Task categories, due date reminders, task sharing
-- **Security**: Refresh token rotation, 2FA support
+- **Security**: OAuth2 integration (Google, GitHub), Audit trail for all actions
 - **Performance**: Redis caching, database indexing optimization
 - **DevOps**: Docker containers, CI/CD pipeline, monitoring
 - **UX**: Drag-and-drop task reordering, dark mode
@@ -199,14 +265,6 @@ I chose Zustand over Redux/Context API because:
 
 - None at time of submission
 
-## 📝 Notes for Reviewers
-
-- The email verification uses a mock service that saves to `mail-outbox.json`
-- Check sent emails at: http://localhost:3000/api/auth/dev/mailbox
-- Default pagination is 10 tasks per page
-- Session expires after 24 hours (configurable via JWT_EXPIRATION)
-
 ## Author
 
 Mohamed Abo Full
-Submitted: October 9, 2025, 8:55 PM
