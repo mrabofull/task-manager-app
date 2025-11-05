@@ -27,31 +27,47 @@ import { LoginAttempt } from './auth/entities/login-attempt.entity';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        url: configService.get('DATABASE_URL'),
-        host: configService.get('DB_HOST'),
-        port: configService.get('DB_PORT')
-          ? +configService.get('DB_PORT')
-          : 5432,
-        username: configService.get('DB_USERNAME'),
-        password: configService.get('DB_PASSWORD'),
-        database: configService.get('DB_NAME'),
-        //entities: [join(process.cwd(), 'dist/**/*.entity.js')],
-        entities: [
-          User,
-          Task,
-          VerificationCode,
-          IpAllowlist,
-          UserSession,
-          LoginAttempt,
-        ],
-        synchronize: process.env.NODE_ENV !== 'production',
-        ssl:
-          process.env.NODE_ENV === 'production'
-            ? { rejectUnauthorized: false }
-            : false,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get('DATABASE_URL');
+
+        if (databaseUrl) {
+          // Production: Use DATABASE_URL from Render
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            entities: [
+              User,
+              Task,
+              VerificationCode,
+              IpAllowlist,
+              UserSession,
+              LoginAttempt,
+            ],
+            synchronize: false, // Never sync in production
+            ssl: { rejectUnauthorized: false },
+          };
+        } else {
+          // Development: Use individual DB configs
+          return {
+            type: 'postgres',
+            host: configService.get('DB_HOST'),
+            port: +configService.get('DB_PORT'),
+            username: configService.get('DB_USERNAME'),
+            password: configService.get('DB_PASSWORD'),
+            database: configService.get('DB_NAME'),
+            entities: [
+              User,
+              Task,
+              VerificationCode,
+              IpAllowlist,
+              UserSession,
+              LoginAttempt,
+            ],
+            synchronize: true, // OK for development
+            ssl: false,
+          };
+        }
+      },
     }),
     TasksModule,
     AuthModule,
