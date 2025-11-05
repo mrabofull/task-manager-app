@@ -10,8 +10,13 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  const allowedOrigins =
+    process.env.NODE_ENV === 'production'
+      ? [process.env.FRONTEND_URL || 'https://your-app.vercel.app']
+      : ['http://localhost:5173', 'http://localhost:4173'];
+
   app.enableCors({
-    origin: 'http://localhost:5173', //5173 || 4173
+    origin: allowedOrigins,
     credentials: true,
   });
 
