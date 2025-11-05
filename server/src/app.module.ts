@@ -43,7 +43,7 @@ import { LoginAttempt } from './auth/entities/login-attempt.entity';
               UserSession,
               LoginAttempt,
             ],
-            synchronize: false, // Never sync in production
+            synchronize: true, // Never sync in production
             ssl: { rejectUnauthorized: false },
           };
         } else {
