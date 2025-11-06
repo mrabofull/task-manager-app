@@ -50,7 +50,7 @@ export class MailService {
     // Try to send email, but fallback if it fails
     let emailSent = false;
 
-    if (process.env.NODE_ENV === 'production' && this.transporter) {
+    if (this.transporter) {
       try {
         await this.transporter.sendMail({
           from: `"${process.env.SMTP_FROM_NAME || 'Task Manager'}" <${process.env.SMTP_USER}>`,
@@ -69,7 +69,6 @@ export class MailService {
     }
 
     if (!emailSent) {
-      // Development: Save to mailbox file
       const mail: MailRecord = {
         id: Date.now().toString(),
         to: email,
