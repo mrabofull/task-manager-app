@@ -12,7 +12,10 @@ async function bootstrap() {
 
   const allowedOrigins =
     process.env.NODE_ENV === 'production'
-      ? [process.env.FRONTEND_URL || 'https://your-app.vercel.app']
+      ? [
+          process.env.FRONTEND_URL ||
+            'https://task-manager-app-cj3n.onrender.com',
+        ]
       : ['http://localhost:5173', 'http://localhost:4173'];
 
   app.enableCors({
