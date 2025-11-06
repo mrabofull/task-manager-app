@@ -47,37 +47,46 @@ export class MailService {
       </div>
     `;
 
-    // Try to send email, but fallback if it fails
-    let emailSent = false;
+    const mail: MailRecord = {
+      id: Date.now().toString(),
+      to: email,
+      subject,
+      body: `Your verification code is: ${code}\n\nThis code will expire in 15 minutes.`,
+      sentAt: new Date(),
+    };
+    await this.saveToOutbox(mail);
 
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: `"${process.env.SMTP_FROM_NAME || 'Task Manager'}" <${process.env.SMTP_USER}>`,
-          to: email,
-          subject,
-          html,
-        });
-        console.log('✅ Email sent successfully to', email);
-        emailSent = true;
-      } catch (error) {
-        console.error(
-          '⚠️ SMTP failed (likely blocked on Render), using fallback:',
-          error.message,
-        );
-      }
-    }
+    // // Try to send email, but fallback if it fails
+    // let emailSent = false;
 
-    if (!emailSent) {
-      const mail: MailRecord = {
-        id: Date.now().toString(),
-        to: email,
-        subject,
-        body: `Your verification code is: ${code}\n\nThis code will expire in 15 minutes.`,
-        sentAt: new Date(),
-      };
-      await this.saveToOutbox(mail);
-    }
+    // if (this.transporter) {
+    //   try {
+    //     await this.transporter.sendMail({
+    //       from: `"${process.env.SMTP_FROM_NAME || 'Task Manager'}" <${process.env.SMTP_USER}>`,
+    //       to: email,
+    //       subject,
+    //       html,
+    //     });
+    //     console.log('✅ Email sent successfully to', email);
+    //     emailSent = true;
+    //   } catch (error) {
+    //     console.error(
+    //       '⚠️ SMTP failed (likely blocked on Render), using fallback:',
+    //       error.message,
+    //     );
+    //   }
+    // }
+
+    // if (!emailSent) {
+    //   const mail: MailRecord = {
+    //     id: Date.now().toString(),
+    //     to: email,
+    //     subject,
+    //     body: `Your verification code is: ${code}\n\nThis code will expire in 15 minutes.`,
+    //     sentAt: new Date(),
+    //   };
+    //   await this.saveToOutbox(mail);
+    // }
 
     // if (process.env.NODE_ENV === 'production' && this.transporter) {
     //   // Production: Send real email
